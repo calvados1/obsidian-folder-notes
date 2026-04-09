@@ -635,6 +635,9 @@ export class Commands {
 				lines.push(...this.getFolderStructureLines(child, currentFilePath, depth + 1));
 				continue;
 			}
+			if (!(child instanceof TFile)) {
+				continue;
+			}
 
 			if (child.path === currentFilePath) {
 				continue;
