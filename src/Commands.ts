@@ -18,6 +18,7 @@ import {
 	openFolderNote,
 	extractFolderName,
 	detachFolderNote,
+	getFolder,
 } from './functions/folderNoteFunctions';
 import { ExcludedFolder } from './ExcludeFolders/ExcludeFolder';
 import { getFolderPathFromString, getFileExplorerActiveFolder } from './functions/utils';
@@ -48,6 +49,24 @@ export class Commands {
 	}
 
 	regularCommands(): void {
+		this.plugin.addCommand({
+			id: 'insert-current-folder-structure',
+			name: t('cmdInsertCurrentFolderStructure'),
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+				const { file } = view;
+				if (!(file instanceof TFile)) return false;
+				if (file.extension !== 'md') return false;
+				const folder = this.getFolderForFolderNote(file);
+				if (!(folder instanceof TFolder)) return false;
+				if (checking) return true;
+
+				const folderStructure = this.buildFolderStructureMarkdown(folder, file.path);
+				editor.replaceSelection(folderStructure);
+				new Notice(t('noticeInsertedFolderStructure'));
+				return true;
+			},
+		});
+
 		this.plugin.addCommand({
 			id: 'turn-into-folder-note',
 			name: t('cmdUseFolderNote'),
@@ -577,5 +596,61 @@ export class Commands {
 					});
 			});
 		}));
+	}
+
+	getFolderForFolderNote(file: TFile): TFolder | null {
+		const folder = getFolder(this.plugin, file);
+		if (!(folder instanceof TFolder)) return null;
+		const folderNote = getFolderNote(this.plugin, folder.path);
+		if (!(folderNote instanceof TFile)) return null;
+		if (folderNote.path !== file.path) return null;
+		return folder;
+	}
+
+	buildFolderStructureMarkdown(folder: TFolder, currentFilePath: string): string {
+		const lines = [
+			`## ${t('folderStructureHeading')}`,
+			'',
+			...this.getFolderStructureLines(folder, currentFilePath, 0),
+		];
+		return lines.join('\n') + '\n';
+	}
+
+	getFolderStructureLines(
+		folder: TFolder,
+		currentFilePath: string,
+		depth: number,
+	): string[] {
+		const sortedChildren = [...folder.children].sort((a, b) => {
+			if (a instanceof TFolder && !(b instanceof TFolder)) return -1;
+			if (!(a instanceof TFolder) && b instanceof TFolder) return 1;
+			return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+		});
+
+		const lines: string[] = [];
+		for (const child of sortedChildren) {
+			const indent = '  '.repeat(depth);
+			if (child instanceof TFolder) {
+				lines.push(`${indent}- 📁 ${child.name}/`);
+				lines.push(...this.getFolderStructureLines(child, currentFilePath, depth + 1));
+				continue;
+			}
+
+			if (child.path === currentFilePath) {
+				continue;
+			}
+			if (child.extension === 'md') {
+				const linkPath = child.path.replace(/\.md$/, '');
+				lines.push(`${indent}- [[${linkPath}|${child.basename}]]`);
+			} else {
+				lines.push(`${indent}- ${child.name}`);
+			}
+		}
+
+		if (depth === 0 && lines.length === 0) {
+			lines.push(`- ${t('folderStructureEmpty')}`);
+		}
+
+		return lines;
 	}
 }
