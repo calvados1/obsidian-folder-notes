@@ -3,6 +3,14 @@
 Folder notes is a plugin for the note taking app  [Obsidian](https://obsidian.md/) that lets you attach notes to folders so that you can click on the name of a folder to open the note like in the app [Notion](https://www.notion.so/).
 This plugin has some unique features that separate it from similar "Folder note" plugins like opening folder notes through the path, creating folder notes for every existing folder, templater/template support and more.
 
+## 🆕 What's new in v1.8.20
+
+**中文语言支持 / Chinese Language Support**
+
+The plugin now supports both **English** and **Chinese (简体中文)**! You can switch the interface language at any time from the **General** settings tab — no restart required. All settings, menus, commands, and notifications are fully translated.
+
+> 插件现已支持中文界面！在「常规」设置页顶部的语言下拉菜单中即可切换，无需重启，所有设置项、菜单、命令及通知均已完整翻译。
+
 Support the development of the plugin
 
 <a href='https://ko-fi.com/D1D1GHGSI' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
