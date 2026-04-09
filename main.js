@@ -325,11 +325,15 @@ var en = {
   cmdOpenFolderNote: "Open this folder's linked note",
   cmdOpenFolderNoteActive: "Open folder note of current active folder in file explorer",
   cmdCreateFolderNoteFromSelection: "Create folder note from selection",
+  cmdInsertCurrentFolderStructure: "Insert current folder structure into this folder note",
   noticeFolderAlreadyExists: "Folder already exists",
   noticeInvalidFileName: 'File name cannot contain any of the following characters: * " \\ / < > : | ?',
   noticeFileNameEndDot: "File name cannot end with a dot",
   noticeFolderNoteAlreadyExists: "Folder note already exists",
   noticeFileAlreadyExists: "File already exists",
+  noticeInsertedFolderStructure: "Inserted current folder structure",
+  folderStructureHeading: "Folder structure",
+  folderStructureEmpty: "_(empty)_",
   menuCreateFolderNote: "Create folder note",
   menuTurnIntoFolderNote: "Turn into folder note for {folderName}",
   menuRemoveFromExcluded: "Remove folder from excluded folders",
@@ -517,11 +521,15 @@ var zh = {
   cmdOpenFolderNote: "\u6253\u5F00\u6B64\u6587\u4EF6\u5939\u7684\u5173\u8054\u7B14\u8BB0",
   cmdOpenFolderNoteActive: "\u6253\u5F00\u6587\u4EF6\u8D44\u6E90\u7BA1\u7406\u5668\u4E2D\u5F53\u524D\u6D3B\u52A8\u6587\u4EF6\u5939\u7684\u6587\u4EF6\u5939\u7B14\u8BB0",
   cmdCreateFolderNoteFromSelection: "\u4ECE\u9009\u4E2D\u6587\u5B57\u521B\u5EFA\u6587\u4EF6\u5939\u7B14\u8BB0",
+  cmdInsertCurrentFolderStructure: "\u5C06\u5F53\u524D\u6587\u4EF6\u5939\u7ED3\u6784\u63D2\u5165\u5230\u6B64\u6587\u4EF6\u5939\u7B14\u8BB0",
   noticeFolderAlreadyExists: "\u6587\u4EF6\u5939\u5DF2\u5B58\u5728",
   noticeInvalidFileName: '\u6587\u4EF6\u540D\u4E0D\u80FD\u5305\u542B\u4EE5\u4E0B\u5B57\u7B26\uFF1A* " \\ / < > : | ?',
   noticeFileNameEndDot: "\u6587\u4EF6\u540D\u4E0D\u80FD\u4EE5\u70B9\u7ED3\u5C3E",
   noticeFolderNoteAlreadyExists: "\u6587\u4EF6\u5939\u7B14\u8BB0\u5DF2\u5B58\u5728",
   noticeFileAlreadyExists: "\u6587\u4EF6\u5DF2\u5B58\u5728",
+  noticeInsertedFolderStructure: "\u5DF2\u63D2\u5165\u5F53\u524D\u6587\u4EF6\u5939\u7ED3\u6784",
+  folderStructureHeading: "\u6587\u4EF6\u5939\u7ED3\u6784",
+  folderStructureEmpty: "_(\u7A7A)_",
   menuCreateFolderNote: "\u521B\u5EFA\u6587\u4EF6\u5939\u7B14\u8BB0",
   menuTurnIntoFolderNote: "\u8BBE\u4E3A {folderName} \u7684\u6587\u4EF6\u5939\u7B14\u8BB0",
   menuRemoveFromExcluded: "\u4ECE\u6392\u9664\u6587\u4EF6\u5939\u4E2D\u79FB\u9664",
@@ -7428,6 +7436,26 @@ var Commands = class {
   }
   regularCommands() {
     this.plugin.addCommand({
+      id: "insert-current-folder-structure",
+      name: t("cmdInsertCurrentFolderStructure"),
+      editorCheckCallback: (checking, editor, view) => {
+        const { file } = view;
+        if (!(file instanceof import_obsidian41.TFile))
+          return false;
+        if (file.extension !== "md")
+          return false;
+        const folder = this.getFolderForFolderNote(file);
+        if (!(folder instanceof import_obsidian41.TFolder))
+          return false;
+        if (checking)
+          return true;
+        const folderStructure = this.buildFolderStructureMarkdown(folder, file.path);
+        editor.replaceSelection(folderStructure);
+        new import_obsidian41.Notice(t("noticeInsertedFolderStructure"));
+        return true;
+      }
+    });
+    this.plugin.addCommand({
       id: "turn-into-folder-note",
       name: t("cmdUseFolderNote"),
       checkCallback: (checking) => {
@@ -7907,6 +7935,59 @@ var Commands = class {
         });
       });
     }));
+  }
+  getFolderForFolderNote(file) {
+    const folder = getFolder(this.plugin, file);
+    if (!(folder instanceof import_obsidian41.TFolder))
+      return null;
+    const folderNote = getFolderNote(this.plugin, folder.path);
+    if (!(folderNote instanceof import_obsidian41.TFile))
+      return null;
+    if (folderNote.path !== file.path)
+      return null;
+    return folder;
+  }
+  buildFolderStructureMarkdown(folder, currentFilePath) {
+    const lines = [
+      `## ${t("folderStructureHeading")}`,
+      "",
+      ...this.getFolderStructureLines(folder, currentFilePath, 0)
+    ];
+    return lines.join("\n") + "\n";
+  }
+  getFolderStructureLines(folder, currentFilePath, depth) {
+    const sortedChildren = [...folder.children].sort((a, b) => {
+      if (a instanceof import_obsidian41.TFolder && !(b instanceof import_obsidian41.TFolder))
+        return -1;
+      if (!(a instanceof import_obsidian41.TFolder) && b instanceof import_obsidian41.TFolder)
+        return 1;
+      return a.name.localeCompare(b.name, void 0, { numeric: true, sensitivity: "base" });
+    });
+    const lines = [];
+    for (const child of sortedChildren) {
+      const indent = "  ".repeat(depth);
+      if (child instanceof import_obsidian41.TFolder) {
+        lines.push(`${indent}- \uD83D\uDCC1 ${child.name}/`);
+        lines.push(...this.getFolderStructureLines(child, currentFilePath, depth + 1));
+        continue;
+      }
+      if (!(child instanceof import_obsidian41.TFile)) {
+        continue;
+      }
+      if (child.path === currentFilePath) {
+        continue;
+      }
+      if (child.extension === "md") {
+        const linkPath = child.path.replace(/\.md$/, "");
+        lines.push(`${indent}- [[${linkPath}|${child.basename}]]`);
+      } else {
+        lines.push(`${indent}- ${child.name}`);
+      }
+    }
+    if (depth === 0 && lines.length === 0) {
+      lines.push(`- ${t("folderStructureEmpty")}`);
+    }
+    return lines;
   }
 };
 
